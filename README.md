@@ -8,7 +8,7 @@ subnets the functions run in, the processor shape and application-wide configura
 
 ```hcl
 module "functions_app" {
-  source = "github.com/cybercapybara/terraform-oci-functions"
+  source = "github.com/moveeeax/terraform-oci-functions"
 
   compartment_id = var.compartment_id
   display_name   = "prod-fn-app"
