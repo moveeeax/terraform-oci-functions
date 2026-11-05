@@ -10,7 +10,7 @@ verification.
 
 ```hcl
 module "functions_app" {
-  source = "github.com/moveeeax/terraform-oci-functions"
+  source = "github.com/moveeeax/terraform-oci-functions?ref=v1.0.0"
 
   compartment_id = var.compartment_id
   display_name   = "prod-fn-app"
