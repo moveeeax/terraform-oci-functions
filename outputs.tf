@@ -17,3 +17,8 @@ output "state" {
   description = "Lifecycle state of the functions application."
   value       = oci_functions_application.this.state
 }
+
+output "invoke_log_id" {
+  description = "OCID of the function invocation log; null when invoke_log is not set."
+  value       = one(oci_logging_log.invoke[*].id)
+}

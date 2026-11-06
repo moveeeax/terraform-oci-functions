@@ -3,8 +3,8 @@
 Terraform module that manages an [Oracle Cloud Infrastructure](https://www.oracle.com/cloud/)
 Functions application, the logical container for serverless functions. It sets the
 subnets the functions run in, the processor shape, application-wide configuration,
-network security groups, log forwarding, distributed tracing and image signature
-verification.
+network security groups, log forwarding, invocation logs in OCI Logging,
+distributed tracing and image signature verification.
 
 ## Usage
 
@@ -25,8 +25,11 @@ module "functions_app" {
     kms_key_ids = [var.image_signing_key_id]
   }
 
-  # Ship function logs to a collector over TLS.
-  syslog_url = "tcp+tls://logs.example.com:6514"
+  # Keep function stdout/stderr in OCI Logging.
+  invoke_log = {
+    log_group_id   = var.log_group_id
+    retention_days = 90
+  }
 
   # Emit traces to an APM domain.
   trace_config = {
@@ -60,6 +63,21 @@ A runnable example lives in [`examples/basic`](examples/basic).
   set it defaults to enabled and requires at least one KMS key OCID.
 - **Log forwarding and tracing** are off unless `syslog_url` / `trace_config` are
   set. Use the `tcp+tls://` syslog scheme so logs are encrypted in transit.
+
+## Invocation logs
+
+Without a log, whatever a function writes to stdout/stderr is lost. Set
+`invoke_log` to create an OCI Logging service log for the application
+(`service = "functions"`, `category = "invoke"`, shown in the Console as
+"Function Invocation Logs") in a log group you already have. The log is named
+`<display_name>_invoke` by default, with characters other than letters, digits,
+`_` and `-` replaced by `_`; retention defaults to 30 days and accepts 30-day
+steps up to 180.
+
+OCI Logging and `syslog_url` are alternatives: while an OCI Logging log is
+enabled, function logs go there, and the syslog URL is kept but not used until
+the log is disabled again
+([Storing and Viewing Function Logs](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsexportingfunctionlogfiles.htm)).
 - Function-level settings (image, image digest, memory and timeout bounds) belong
   to `oci_functions_function`, which this module does not manage.
 
@@ -93,17 +111,19 @@ the module itself still supports >= 1.5.
 | `syslog_url`                 | Syslog endpoint for function logs (`tcp://`, `udp://` or `tcp+tls://`). Null disables forwarding. | `string`       | `null`          |    no    |
 | `trace_config`               | APM tracing: `{ domain_id, is_enabled = true }`. Null disables tracing.                          | `object`       | `null`          |    no    |
 | `image_policy_config`        | Image signature verification: `{ is_policy_enabled = true, kms_key_ids = [] }`. Null disables it. | `object`       | `null`          |    no    |
+| `invoke_log`                 | Invocation log: `{ log_group_id, display_name = null, retention_days = 30, is_enabled = true }`. Null creates no log. | `object`       | `null`          |    no    |
 | `freeform_tags`              | Free-form tags applied to the application.                                                       | `map(string)`  | `{}`            |    no    |
 | `defined_tags`               | Defined tags applied to the application, keyed `namespace.key`.                                  | `map(string)`  | `{}`            |    no    |
 
 ## Outputs
 
-| Name           | Description                                    |
-|----------------|------------------------------------------------|
-| `id`           | OCID of the functions application.             |
-| `display_name` | Display name of the functions application.     |
-| `shape`        | Processor shape for functions.                 |
-| `state`        | Lifecycle state of the functions application.  |
+| Name            | Description                                                     |
+|-----------------|-----------------------------------------------------------------|
+| `id`            | OCID of the functions application.                              |
+| `display_name`  | Display name of the functions application.                      |
+| `shape`         | Processor shape for functions.                                  |
+| `state`         | Lifecycle state of the functions application.                   |
+| `invoke_log_id` | OCID of the invocation log; null when `invoke_log` is not set.  |
 
 ## License
 

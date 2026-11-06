@@ -36,6 +36,111 @@ run "defaults_are_conservative" {
     condition     = oci_functions_application.this.display_name == "unit-test-fn-app"
     error_message = "display_name must be passed through to the application."
   }
+
+  assert {
+    condition     = length(oci_logging_log.invoke) == 0
+    error_message = "No invocation log may be created unless invoke_log is set."
+  }
+
+  assert {
+    condition     = output.invoke_log_id == null
+    error_message = "invoke_log_id must be null when invoke_log is not set."
+  }
+}
+
+run "invoke_log_is_attached_to_the_application" {
+  command = apply
+
+  variables {
+    display_name = "unit test fn-app"
+
+    invoke_log = {
+      log_group_id = "ocid1.loggroup.oc1.phx.aaaaaaaaexampleloggroup"
+    }
+  }
+
+  assert {
+    condition     = length(oci_logging_log.invoke) == 1
+    error_message = "Setting invoke_log must create exactly one log."
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].log_type == "SERVICE"
+    error_message = "The invocation log must be a SERVICE log."
+  }
+
+  assert {
+    condition     = one(one(oci_logging_log.invoke[0].configuration).source).service == "functions"
+    error_message = "The invocation log source must be the functions service."
+  }
+
+  assert {
+    condition     = one(one(oci_logging_log.invoke[0].configuration).source).category == "invoke"
+    error_message = "The invocation log category must be invoke."
+  }
+
+  assert {
+    condition     = one(one(oci_logging_log.invoke[0].configuration).source).resource == oci_functions_application.this.id
+    error_message = "The invocation log must point at this application."
+  }
+
+  assert {
+    condition     = one(oci_logging_log.invoke[0].configuration).compartment_id == var.compartment_id
+    error_message = "The log source compartment must be the application's compartment."
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].log_group_id == "ocid1.loggroup.oc1.phx.aaaaaaaaexampleloggroup"
+    error_message = "log_group_id must be passed through."
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].retention_duration == 30
+    error_message = "Retention should default to 30 days."
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].is_enabled == true
+    error_message = "The invocation log should default to enabled."
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].display_name == "unit_test_fn-app_invoke"
+    error_message = "The default log name must be the sanitised application name plus _invoke."
+  }
+
+  assert {
+    condition     = output.invoke_log_id == oci_logging_log.invoke[0].id
+    error_message = "invoke_log_id must expose the log OCID."
+  }
+}
+
+run "invoke_log_overrides_are_passed_through" {
+  command = apply
+
+  variables {
+    invoke_log = {
+      log_group_id   = "ocid1.loggroup.oc1.phx.aaaaaaaaexampleloggroup"
+      display_name   = "fn-invocations"
+      retention_days = 90
+      is_enabled     = false
+    }
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].display_name == "fn-invocations"
+    error_message = "invoke_log.display_name must override the default name."
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].retention_duration == 90
+    error_message = "invoke_log.retention_days must be passed through."
+  }
+
+  assert {
+    condition     = oci_logging_log.invoke[0].is_enabled == false
+    error_message = "invoke_log.is_enabled must be passed through."
+  }
 }
 
 run "optional_features_are_reachable" {
@@ -190,4 +295,42 @@ run "rejects_non_kms_key_ocid" {
   }
 
   expect_failures = [var.image_policy_config]
+}
+
+run "rejects_non_log_group_ocid_for_invoke_log" {
+  command = plan
+
+  variables {
+    invoke_log = {
+      log_group_id = "ocid1.compartment.oc1..aaaaaaaaexamplecompartment"
+    }
+  }
+
+  expect_failures = [var.invoke_log]
+}
+
+run "rejects_invoke_log_retention_outside_30_day_steps" {
+  command = plan
+
+  variables {
+    invoke_log = {
+      log_group_id   = "ocid1.loggroup.oc1.phx.aaaaaaaaexampleloggroup"
+      retention_days = 45
+    }
+  }
+
+  expect_failures = [var.invoke_log]
+}
+
+run "rejects_blank_invoke_log_name" {
+  command = plan
+
+  variables {
+    invoke_log = {
+      log_group_id = "ocid1.loggroup.oc1.phx.aaaaaaaaexampleloggroup"
+      display_name = "  "
+    }
+  }
+
+  expect_failures = [var.invoke_log]
 }
