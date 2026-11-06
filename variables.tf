@@ -108,6 +108,32 @@ variable "image_policy_config" {
   }
 }
 
+variable "invoke_log" {
+  description = "Function invocation log (OCI Logging service log, service \"functions\", category \"invoke\") in an existing log group. Null (the default) creates no log. display_name defaults to \"<display_name>_invoke\", the name the OCI Console proposes; retention_days must be 30, 60, 90, 120, 150 or 180."
+  type = object({
+    log_group_id   = string
+    display_name   = optional(string)
+    retention_days = optional(number, 30)
+    is_enabled     = optional(bool, true)
+  })
+  default = null
+
+  validation {
+    condition     = var.invoke_log == null || can(regex("^ocid1\\.loggroup\\.", try(var.invoke_log.log_group_id, "")))
+    error_message = "invoke_log.log_group_id must be a log group OCID (ocid1.loggroup...)."
+  }
+
+  validation {
+    condition     = var.invoke_log == null || contains([30, 60, 90, 120, 150, 180], try(var.invoke_log.retention_days, 0))
+    error_message = "invoke_log.retention_days must be one of 30, 60, 90, 120, 150 or 180. OCI accepts retention only in 30-day increments up to 180 days and rejects anything else at apply time."
+  }
+
+  validation {
+    condition     = var.invoke_log == null || try(var.invoke_log.display_name, null) == null || try(length(trimspace(var.invoke_log.display_name)) > 0, false)
+    error_message = "invoke_log.display_name must not be blank; leave it null to use \"<display_name>_invoke\"."
+  }
+}
+
 variable "freeform_tags" {
   description = "Free-form tags applied to the functions application."
   type        = map(string)

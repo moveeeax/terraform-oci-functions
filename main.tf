@@ -39,3 +39,30 @@ resource "oci_functions_application" "this" {
   freeform_tags = var.freeform_tags
   defined_tags  = var.defined_tags
 }
+
+# Function invocation logs. OCI models them as a Logging service log whose
+# source is the application (service "functions", category "invoke"); without
+# one, function stdout/stderr is dropped unless syslog_url forwards it.
+resource "oci_logging_log" "invoke" {
+  count = var.invoke_log == null ? 0 : 1
+
+  display_name       = coalesce(var.invoke_log.display_name, "${replace(var.display_name, "/[^A-Za-z0-9_-]/", "_")}_invoke")
+  log_group_id       = var.invoke_log.log_group_id
+  log_type           = "SERVICE"
+  is_enabled         = var.invoke_log.is_enabled
+  retention_duration = var.invoke_log.retention_days
+
+  configuration {
+    compartment_id = var.compartment_id
+
+    source {
+      category    = "invoke"
+      resource    = oci_functions_application.this.id
+      service     = "functions"
+      source_type = "OCISERVICE"
+    }
+  }
+
+  freeform_tags = var.freeform_tags
+  defined_tags  = var.defined_tags
+}

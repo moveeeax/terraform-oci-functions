@@ -20,6 +20,12 @@ module "functions_app" {
     kms_key_ids = [var.image_signing_kms_key_id]
   }
 
+  # Keep function stdout/stderr in OCI Logging when a log group is supplied.
+  invoke_log = var.log_group_id == null ? null : {
+    log_group_id   = var.log_group_id
+    retention_days = 30
+  }
+
   # Emit traces to an APM domain when one is supplied.
   trace_config = var.apm_domain_id == null ? null : {
     domain_id = var.apm_domain_id
@@ -65,6 +71,12 @@ variable "image_signing_kms_key_id" {
 
 variable "apm_domain_id" {
   description = "Optional APM domain OCID to send function traces to."
+  type        = string
+  default     = null
+}
+
+variable "log_group_id" {
+  description = "Optional log group OCID that receives the function invocation log."
   type        = string
   default     = null
 }
